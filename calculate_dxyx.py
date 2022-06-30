@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 import sys
+import argparse
 from itertools import combinations
 from time import time
-time0 = time()
 # Calculates dxy for multiple aligned fasta files.
 # Each fasta file contains data for a single locus (aligned sequences for both ecotypes from multiple locations).
 # For each locus, loops through all locations and calculates dxy between ecotypes.
 # Version 0.2
 
 def parse_fasta(infile):
+    """Parse a fatsa file"""
     name, seq = None, []
     for line in infile: # for loop
         line = line.rstrip() # strip the white spaces on the right
@@ -21,6 +22,7 @@ def parse_fasta(infile):
 
 
 def dx(pop1, mode="nucleotide"):
+    """Calculate dx from a population"""
     valid_chars = 'ATGCU'
     if mode == 'amino':
         valid_chars = 'ACDEFGHIKLMNPQRSTVWY'
@@ -40,8 +42,8 @@ def dx(pop1, mode="nucleotide"):
   
     return sum_of_pairwise_distances, total_comparisons
 
-# function to calculate dxy, adjusted from script by Simon Martin
 def dxy(pop1,pop2, mode='nucleotide'):
+    """calculate dxy from two populations"""
     valid_chars = 'ATGCU'
     if mode == 'amino':
         valid_chars = 'ACDEFGHIKLMNPQRSTVWY'
@@ -60,80 +62,87 @@ def dxy(pop1,pop2, mode='nucleotide'):
         return "na", 'na'         
     return sum_of_pairwise_distances, total_comparisons
 
-# generate results file
-outFileName = sys.argv[2]
-outFile = open(outFileName, "w")
-outFile.write("\t".join([
-    "measure",
-    "geno1",
-    "geno2",
-    "dxy",
-    "dx1", 
-    "dxyx1", 
-    "dx2", 
-    "dxyx2", 
-    "n1", 
-    "n2",
-    'ncomp'])+
-     "\n")
 
-# make list of populations
-# genotypes = ["P4", "P6", "P7", "P8", "P13", "P15"]
-genotypes =[]
-dx_values = {}
-fafile = open(sys.argv[1], "r")
-for label, seq in parse_fasta(fafile): 
-    genotype = label.split("/")[6]
-    genotypes.append(genotype)
-fafile.close()
-genotypes = list(set(genotypes))
-print(genotypes)
-
-for i, geno1 in enumerate(genotypes):
-    pop1 = []
-    fafile = open(sys.argv[1], "r")
+def main(arguments=sys.argv[1:]):
+    """Main method for calculate_dxyx"""
+    time0 = time()
+    parser = argparse.ArgumentParser(description="""
+    Converts multisample-VCF to MAF file with some filters """)
+    parser.add_argument("infile")
+    parser.add_argument("outfile")
+    parser.add_argument("--mode", choices=("nucleotide", "amino"))
+    args = parser.parse_args(args=arguments)
+    outFile = open(args.outfile, "w")
+    outFile.write("\t".join([
+        "measure",
+        "geno1",
+        "geno2",
+        "dxy",
+        "dx1", 
+        "dxyx1", 
+        "dx2", 
+        "dxyx2", 
+        "n1", 
+        "n2",
+        'ncomp'])+
+        "\n")
+    genotypes =[]
+    dx_values = {}
+    fafile = open(args.infile, "r")
     for label, seq in parse_fasta(fafile): 
         genotype = label.split("/")[6]
-        if genotype == geno1:
-            pop1.append(seq)
-    if pop1: 
-        dx_total, dx_comparisons = dx(pop1)
-        print('dx', geno1, len(pop1), dx_comparisons, 
-              dx_total / dx_comparisons if dx_comparisons !='na' else 'na')
-        if dx_total != 'na':
-            dx_values[geno1] = dx_total / dx_comparisons
-
-for i, geno1 in enumerate(genotypes):
-    for geno2 in genotypes[i+1:]:
+        genotypes.append(genotype)
+    fafile.close()
+    genotypes = list(set(genotypes))
+    print(genotypes)
+    for i, geno1 in enumerate(genotypes):
         pop1 = []
-        pop2 = []
-        fafile = open(sys.argv[1], "r")
+        fafile = open(args.infile, "r")
         for label, seq in parse_fasta(fafile): 
             genotype = label.split("/")[6]
             if genotype == geno1:
                 pop1.append(seq)
-            if genotype == geno2:
-                pop2.append(seq)
-        if pop1 and pop2: 
-            dxy_total, dxy_comparisons = dxy(pop1, pop2)
-            dxy_value = 'na' if dxy_total == 'na' else dxy_total / dxy_comparisons
-            print('dxy', geno1, geno2, len(pop1), len(pop2), dxy_comparisons, 
-                  dxy_value)
-            outFile.write("\t".join([
-                "dxyx", 
-                geno1, 
-                geno2, 
-                str(dxy_value), 
-                str(dx_values.get(geno1, 'na')),
-                str(dxy_value - dx_values[geno1]) if geno1 in dx_values else 'na', 
-                str(dx_values.get(geno2, 'na')),
-                str(dxy_value - dx_values[geno2]) if geno2 in dx_values else 'na',
-                str(len(pop1)), 
-                str(len(pop2)),
-                str(dxy_comparisons)
-                ]) + 
-                "\n")
-        fafile.close()
-    
-outFile.close()
-print("Completed in: ", time() - time0, "seconds")
+        if pop1: 
+            dx_total, dx_comparisons = dx(pop1)
+            print('dx', geno1, len(pop1), dx_comparisons, 
+                dx_total / dx_comparisons if dx_comparisons !='na' else 'na')
+            if dx_total != 'na':
+                dx_values[geno1] = dx_total / dx_comparisons
+
+    for i, geno1 in enumerate(genotypes):
+        for geno2 in genotypes[i+1:]:
+            pop1 = []
+            pop2 = []
+            fafile = open(args.infile, "r")
+            for label, seq in parse_fasta(fafile): 
+                genotype = label.split("/")[6]
+                if genotype == geno1:
+                    pop1.append(seq)
+                if genotype == geno2:
+                    pop2.append(seq)
+            if pop1 and pop2: 
+                dxy_total, dxy_comparisons = dxy(pop1, pop2)
+                dxy_value = 'na' if dxy_total == 'na' else dxy_total / dxy_comparisons
+                print('dxy', geno1, geno2, len(pop1), len(pop2), dxy_comparisons, 
+                    dxy_value)
+                outFile.write("\t".join([
+                    "dxyx", 
+                    geno1, 
+                    geno2, 
+                    str(dxy_value), 
+                    str(dx_values.get(geno1, 'na')),
+                    str(dxy_value - dx_values[geno1]) if geno1 in dx_values else 'na', 
+                    str(dx_values.get(geno2, 'na')),
+                    str(dxy_value - dx_values[geno2]) if geno2 in dx_values else 'na',
+                    str(len(pop1)), 
+                    str(len(pop2)),
+                    str(dxy_comparisons)
+                    ]) + 
+                    "\n")
+            fafile.close()
+    outFile.close()
+    print("Completed in: ", time() - time0, "seconds")
+    return ''
+
+if __name__ == "__main__":
+    main()
