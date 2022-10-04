@@ -15,7 +15,6 @@ import matplotlib.colors
 from matplotlib.colors import ListedColormap
 from sklearn.manifold import MDS
 from matplotlib import pyplot as plt, cm, colors
-from mixcore import CSVfile
 from time import time
 
 _LICENSE = """
@@ -38,8 +37,36 @@ You should have received a copy of the GNU General Public License
 along with MixTAPE.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+class CSVfile(object):
+    "field-delimited data file"
+
+    def __init__(self, fpath, delimiter=",",
+                 colheaders=True):
+        self.path = os.path.abspath(fpath)
+        self.delimiter = delimiter
+        self.colheaders = colheaders
+        if self.colheaders is True:
+            with open(self.path) as csvfile:
+                self.colheaders = csvfile.readline().split(
+                    self.delimiter)
+
+    def __iter__(self):
+        firstline = True
+        with open(self.path) as csvfile:
+            for line in csvfile:
+                if self.colheaders is not False and firstline is True:
+                    firstline = False
+                    continue
+                yield line.rstrip().split(self.delimiter)
 
 
+
+COLORS = {'P1': 'r',
+          'P2': 'g',
+          'P3': 'b',
+          'P4': 'orange',
+          'P6': 'm'
+         }
 def generate_argparser():
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -73,9 +100,9 @@ def main(arguments=None):
     colors = ('xkcd:puke green', 'xkcd:sky blue', 'xkcd:gold', 'xkcd:rust', 'xkcd:light violet', 'xkcd:chartreuse', 'xkcd:cyan', 'xkcd:light tan', 'xkcd:coral', 'xkcd:bluish purple', 'xkcd:grass', 'xkcd:turquoise', 'xkcd:bright yellow', 'xkcd:maroon', 'xkcd:grape', 'xkcd:jungle green', 'xkcd:navy blue', 'xkcd:golden yellow', 'xkcd:dark pink', 'xkcd:periwinkle blue', 'xkcd:dark olive green', 'xkcd:royal blue', 'xkcd:pastel orange', 'xkcd:light pink', 'xkcd:medium purple', 'xkcd:poop', 'xkcd:dusty rose', 'xkcd:hospital green', 'xkcd:bright red', 'xkcd:faded yellow', 'xkcd:light aqua', 'xkcd:diarrhea', 'xkcd:cerise', 'xkcd:melon', 'xkcd:bubblegum')
     cmap = matplotlib.colors.ListedColormap(colors)
     norm = matplotlib.colors.Normalize(vmin=1, vmax=35, clip=False)
-    #class matplotlib.colors.ListedColormap(colors,name='from_List',N=35) 	
+    #class matplotlib.colors.ListedColormap(colors,name='from_List',N=35)
     #cmap = cm.from_List
-    if args.figsize is not None: 
+    if args.figsize is not None:
         fig = plt.figure(figsize=(args.figsize[0], args.figsize[1]), )
     else:
         fig = plt.figure()
@@ -114,8 +141,8 @@ def main(arguments=None):
             j = hindex[entry[1]]
             arr[i][j] = float(entry[2])
             arr[j][i] = float(entry[2])
-    mds = MDS(n_components=2, dissimilarity='precomputed', 
-              max_iter=100000)
+    mds = MDS(n_components=2, dissimilarity='precomputed',
+              max_iter=100000, eps=1e-6)
     #arr = np.exp(arr)
     print(arr)
     results = mds.fit(arr)
@@ -134,8 +161,13 @@ def main(arguments=None):
             if icolor > 34:
                 icolor = 34
 
-    groupcolors = [color_index[x] for x in grouplabels]
+    #groupcolors = [color_index[x] for x in grouplabels]
+    groupcolors = [COLORS.get(x, 'k') for x in grouplabels]
     ax1.scatter(coords[:, 0], coords[:, 1], marker='o', s=3, c=groupcolors)
+
+    for i, x in enumerate(grouplabels):
+        ax1.annotate(x, xy=(coords[i, 0], coords[i, 1]), size="4")
+
      #       print(x, y)
      #       ax1.annotate(
      #           #grplabel,
@@ -147,7 +179,7 @@ def main(arguments=None):
     #ax1.legend(prop={'size': 10})
     plt.tight_layout()
     plt.savefig(args.out)
-    print(time() - time0)
+    print('Completed in {:.2f} seconds.'.format(time() - time0))
     return ''
 
 

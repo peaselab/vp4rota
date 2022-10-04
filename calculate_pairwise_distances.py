@@ -10,8 +10,7 @@ James B. Pease
 import os
 import sys
 import argparse
-from mixcore import fasta_iter
-from itertools import combinations
+from itertools import combinations, groupby
 from random import sample as rsample
 from Bio.SubsMat import MatrixInfo
 import numpy as np
@@ -52,6 +51,18 @@ AMBIG = {"A": "A",
          "H": "ACT",
          "V": "ACG",
          "N": "ACGT"}
+
+def fasta_iter(fasta_name):
+    """
+        given a fasta file. yield tuples of header, sequence
+        Adapted from https://github.com/brentp
+    """
+    filehandler = open(fasta_name, 'r')
+    faiter = (x[1] for x in groupby(filehandler, lambda line: line[0] == ">"))
+    for header in faiter:
+        header = next(header)[1:].strip()
+        seq = "".join(s.strip() for s in next(faiter))
+        yield header, seq
 
 def calc_pwdist_nuc(seq0, seq1, mode="random2"):
     diff = 0
