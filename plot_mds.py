@@ -72,13 +72,16 @@ COLORS = {'P1': 'xkcd:violet',
           'P30': 'r',
           'P31': 'r',
           'P35': 'r',
-          'P36': 'r',
           'P40': 'r',
           'P42': 'xkcd:bubblegum',
           'P43': 'xkcd:bubblegum',
           'P43': 'xkcd:bubblegum',
 
          }
+xcol = list(COLORS.keys())
+for x in xcol:
+    COLORS[x + "*"] = COLORS[x]
+
 def generate_argparser():
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -169,7 +172,8 @@ def main(arguments=None):
         #global rep
     #    rep = set([])
     #for label, x, y in zip(csvfile.colheaders[1:], coords[:, 0], coords[:, 1]):
-    grouplabels = [x.split(args.labeldelim)[args.labelfield] for x in headers]
+    grouplabels = [x.split(args.labeldelim)[args.labelfield] + (
+        "*" if x[0] == '*' else '') for x in headers]
     color_index = {}
     icolor = 0
     for x in grouplabels:
