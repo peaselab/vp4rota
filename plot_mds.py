@@ -37,6 +37,8 @@ You should have received a copy of the GNU General Public License
 along with MixTAPE.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+np.seterr(divide='ignore', invalid='ignore')
+
 class CSVfile(object):
     "field-delimited data file"
 
@@ -61,11 +63,21 @@ class CSVfile(object):
 
 
 
-COLORS = {'P1': 'r',
+COLORS = {'P1': 'xkcd:violet',
           'P2': 'g',
           'P3': 'b',
           'P4': 'orange',
-          'P6': 'm'
+          'P6': 'm',
+          'P17': 'r',
+          'P30': 'r',
+          'P31': 'r',
+          'P35': 'r',
+          'P36': 'r',
+          'P40': 'r',
+          'P42': 'xkcd:bubblegum',
+          'P43': 'xkcd:bubblegum',
+          'P43': 'xkcd:bubblegum',
+
          }
 def generate_argparser():
     parser = argparse.ArgumentParser(
@@ -131,6 +143,7 @@ def main(arguments=None):
             hindex[entry[1]] = nseq - 1
             nseq += 1
     print(nseq)
+    seed = np.random.RandomState(seed=3)
     arr = np.zeros((nseq, nseq))
     with open(args.pwdist) as infile:
         for line in infile:
@@ -141,8 +154,13 @@ def main(arguments=None):
             j = hindex[entry[1]]
             arr[i][j] = float(entry[2])
             arr[j][i] = float(entry[2])
+    #for i in range(nseq):
+    #    arr[i][i] = 1.0
+
     mds = MDS(n_components=2, dissimilarity='precomputed',
-              max_iter=100000, eps=1e-6)
+              max_iter=3000,
+              random_state=seed,
+              eps=1e-9)
     #arr = np.exp(arr)
     print(arr)
     results = mds.fit(arr)

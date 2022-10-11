@@ -10,10 +10,10 @@ James B. Pease
 import os
 import sys
 import argparse
-from itertools import combinations, groupby
+from itertools import groupby
 from random import sample as rsample
 from Bio.SubsMat import MatrixInfo
-import numpy as np
+# import numpy as np
 import time
 
 _LICENSE = """
@@ -52,6 +52,7 @@ AMBIG = {"A": "A",
          "V": "ACG",
          "N": "ACGT"}
 
+
 def fasta_iter(fasta_name):
     """
         given a fasta file. yield tuples of header, sequence
@@ -64,7 +65,9 @@ def fasta_iter(fasta_name):
         seq = "".join(s.strip() for s in next(faiter))
         yield header, seq
 
-def calc_pwdist_nuc(seq0, seq1, mode="random2"):
+
+def calc_pwdist_nuc(seq0, seq1, mode="random2", alpha=1,
+                    minoverlap=200):
     diff = 0
     total = 0
     for i, base0 in enumerate(seq0):
@@ -79,17 +82,24 @@ def calc_pwdist_nuc(seq0, seq1, mode="random2"):
         if base0 in "RYWSMK" or base1 in "RYWSMK":
             if mode != "random2":
                 continue
-        base0 = rsample(AMBIG[base0], 1)[0]
-        base1 = rsample(AMBIG[base1], 1)[0]
+        if mode in ("random2", "random4"):
+            base0 = rsample(AMBIG[base0], 1)[0]
+            base1 = rsample(AMBIG[base1], 1)[0]
         total += 1
-        if base0 != base1:
+        if base0 + base1 in (
+            'AC', 'AT', 'CA', 'CG',
+                'GC', 'GT', 'TA', 'TG'):
+            diff += alpha
+        elif base0 + base1 in (
+                'AG', 'CT', 'GA', 'TC'):
             diff += 1
-    if total == 0:
+    if total < minoverlap:
         return "na"
     return float(diff / total)
 
 
-def calc_pwdist_prot(seq0, seq1, model="simple"):
+def calc_pwdist_prot(seq0, seq1, model="simple",
+                     minoverlap=200):
     diff = 0
     total = 0
     matrix = None
@@ -100,7 +110,6 @@ def calc_pwdist_prot(seq0, seq1, model="simple"):
             matrix = MatrixInfo.blosum45
         elif model == "blosum80":
             matrix = MatrixInfo.blosum80
-        #print(matrix)
         for i, base0 in enumerate(seq0):
             base0 = base0.upper()
             base1 = seq1[i].upper()
@@ -124,14 +133,9 @@ def calc_pwdist_prot(seq0, seq1, model="simple"):
             total += 1
             if base0 != base1:
                 diff += 1
-    if total == 0:
+    if total < minoverlap:
         return "na"
-    #print(diff, total, diff/total)
     return float(diff / total)
-
-
-
-
 
 
 def generate_argparser():
@@ -152,9 +156,15 @@ def generate_argparser():
     parser.add_argument("--seqtype", choices=("nuc", "prot"),
                         default="nuc",
                         help="nucleotide or protein alignment")
-    parser.add_argument("--model", choices=("simple", "blosum62", "blosum45", "blosum80"),
+    parser.add_argument("--min-overlap", type=int, default=200)
+    parser.add_argument("--model", choices=("simple",
+                                            "blosum62", "blosum45",
+                                            "blosum80"),
                         default="simple",
                         help="simple distance or amino acid model")
+    parser.add_argument("--alpha", default=1,
+                        help=("transversion/transition score ratio, change"
+                              " from alpha=1 to set K80 model"))
     return parser
 
 
@@ -165,7 +175,6 @@ def main(arguments=None):
     args = parser.parse_args(args=arguments)
     headers = []
     seqs = {}
-    position_index = {}
     for hdr, seq in fasta_iter(args.fasta):
         headers.append(hdr)
         seqs[hdr] = seq
@@ -173,8 +182,19 @@ def main(arguments=None):
         for i, hdr0 in enumerate(headers):
             for j in range(i+1, len(headers)):
                 hdr1 = headers[j]
-                outfile.write("\t".join([hdr0, hdr1, str(
-                    calc_pwdist_prot(seqs[hdr0], seqs[hdr1], model=args.model))]) + "\n")
+                if args.seqtype == "nuc":
+                    dist = calc_pwdist_nuc(
+                        seqs[hdr0], seqs[hdr1],
+                        mode=args.mode,
+                        alpha=args.alpha,
+                        minoverlap=args.min_overlap)
+                elif args.seqtype == "prot":
+                    dist = calc_pwdist_prot(
+                        seqs[hdr0], seqs[hdr1],
+                        model=args.model,
+                        minoverlap=args.min_overlap)
+
+                outfile.write("\t".join([hdr0, hdr1, str(dist)]) + "\n")
     print(time.time() - time0)
     return ''
 
